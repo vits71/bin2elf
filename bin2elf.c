@@ -323,7 +323,7 @@ static void spew(char *map, ssize_t mapsize){
 		unsigned addr = le32_to_cpu(fwheader.baseaddr);
 		unsigned past = (addr & SEG_MASK) + len;
 		if(past>0x28000 || past<500){
-			fprintf(stderr,"exiting: past>0x28000 || past<500\n");
+			fprintf(stderr,"exiting: past>0x28000 || past<500: past=%08x\n", past);
 			exit(89);
 		}
 		if(do_crc(0,(unsigned char*)map,len+4)){
