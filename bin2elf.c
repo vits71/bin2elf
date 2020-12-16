@@ -163,11 +163,11 @@ static int newstr(const char *restrict const s){
 
 #define ARRAYSIZE(x) (sizeof(x)/sizeof((x)[0]))
 
-static int phi;
-static int shi;
+static int phi=0;
+static int shi=0;
 static struct{
 	Elf32_Ehdr ehdr;
-	Elf32_Phdr phdr[2];
+	Elf32_Phdr phdr[3];
 	Elf32_Shdr shdr[10];
 	char shstrtab[10*8];
 }e;
@@ -230,7 +230,7 @@ static void mkelf(void){
 	unsigned x4sz = upper4-lower4;
 	unsigned xcsz = upperC-lowerC;
 	ss("",         0,0,0x00000000,0x00000,0x00000,NULL); // broken GNU crap expects this
-	ss(".000",     0,1,lower0,    0x10000,SEG_0_FILE_OFF,&x0sz);// 1st chunk of code
+	ss(".000",     0,1,lower0,    MAX_SEG_LEN,SEG_0_FILE_OFF,&x0sz);// 1st chunk of code
 	ss(".040",     1,0,lower4,		0x02000,SEG_4_FILE_OFF,&x4sz); // boot code sets SP to 0x04002000
 	ss(".800",     1,0,0x80000000,0x10000,SEG_4_FILE_OFF,NULL); // IO memory, probably including USB
 	ss(".900",     1,0,0x90000000,0x0c000,SEG_4_FILE_OFF,NULL); // IO memory
