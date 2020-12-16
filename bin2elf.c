@@ -30,6 +30,9 @@ typedef unsigned long long u64;
 #define SEG_MASK 0x0003ffff
 #define MAX_SEG_LEN 0x28000
 #define MIN_SEG_LEN 500
+#define SEG_C_FILE_OFF 0x21000
+#define SEG_4_FILE_OFF 0x11000
+#define SEG_0_FILE_OFF 0x01000
 
 #if defined(__BIG_ENDIAN__) || defined(_BIG_ENDIAN)
 
@@ -133,17 +136,21 @@ static unsigned do_crc(unsigned remainder, const unsigned char *p, unsigned n){
 
 ////////////////////////////////////
 
-static char elfdata[4096+(64+64*4)*1024];
+#define SHSTRTAB_SZ 4096
+
+static char elfdata[SHSTRTAB_SZ+(64+64*4)*1024];
 
 static unsigned entrypoint;
 
 static unsigned upper0;
+static unsigned upper4;
 static unsigned upperC;
 static unsigned lower0 = ~0u;
+static unsigned lower4 = ~0u;
 static unsigned lowerC = ~0u;
 
 static unsigned shsz;
-static char shstrtab[4096];
+static char shstrtab[SHSTRTAB_SZ];
 
 static int newstr(const char *restrict const s){
 	int len = strlen(s)+1;
@@ -212,23 +219,24 @@ static void ss(const char *restrict const name, int w, int x, unsigned memaddr, 
 }
 
 static void mkelf(void){
-	if(sizeof e > 4096){
+	if(sizeof e > SHSTRTAB_SZ){
 		fprintf(stderr, "shit, %d bytes\n", (int)(sizeof e));
 		exit(45);
 	}
 
 	unsigned x0sz = upper0-lower0;
+	unsigned x4sz = upper4-lower4;
 	unsigned xcsz = upperC-lowerC;
 	ss("",         0,0,0x00000000,0x00000,0x00000,NULL); // broken GNU crap expects this
-	ss(".000",     0,1,lower0,    0x10000,0x01000,&x0sz);// 1st chunk of code
-	ss(".040",     1,0,0x04000000,0x02000,0x11000,NULL); // boot code sets SP to 0x04002000
-	ss(".800",     1,0,0x80000000,0x10000,0x11000,NULL); // IO memory, probably including USB
-	ss(".900",     1,0,0x90000000,0x0c000,0x11000,NULL); // IO memory
+	ss(".000",     0,1,lower0,    0x10000,SEG_0_FILE_OFF,&x0sz);// 1st chunk of code
+	ss(".040",     1,0,lower4,		0x02000,SEG_4_FILE_OFF,&x4sz); // boot code sets SP to 0x04002000
+	ss(".800",     1,0,0x80000000,0x10000,SEG_4_FILE_OFF,NULL); // IO memory, probably including USB
+	ss(".900",     1,0,0x90000000,0x0c000,SEG_4_FILE_OFF,NULL); // IO memory
 	if(lowerC>0xc0000000)
-		ss(".clo",     1,0,0xc0000000,lowerC-0xc0000000,0x11000,NULL);
+		ss(".clo",     1,0,0xc0000000,lowerC-0xc0000000,SEG_C_FILE_OFF,NULL);
 	unsigned cgap = lowerC - 0xc0000000u;
-	ss(".c00",     1,1,lowerC,    MAX_SEG_LEN-cgap,0x11000+cgap,&xcsz);// 2nd chunk of code, initialized data, uninitialized data, heap
-	ss(".fff",     0,1,0xffff0000,0x0fff0,0x11000+cgap+xcsz,NULL); // there might be a ROM in here somewhere
+	ss(".c00",     1,1,lowerC,    MAX_SEG_LEN-cgap,SEG_C_FILE_OFF+cgap,&xcsz);// 2nd chunk of code, initialized data, uninitialized data, heap
+	ss(".fff",     0,1,0xffff0000,0x0fff0,SEG_C_FILE_OFF+cgap+xcsz,NULL); // there might be a ROM in here somewhere
 	ss(".shstrtab",0,0,0x00000000,0x00000,42, &shsz); // must be last for e_shstrndx patchup below
 
 	memcpy(&e.ehdr,"\177ELF", 4);
@@ -324,8 +332,8 @@ static void spew(char *map, ssize_t mapsize){
 		unsigned len = le32_to_cpu(fwheader.datalength) - 4;
 		unsigned addr = le32_to_cpu(fwheader.baseaddr);
 		unsigned past = (addr & SEG_MASK) + len;
-		if(past>MAX_SEG_LEN || past<MAX_SEG_LEN){
-			fprintf(stderr,"exiting: past>MAX_SEG_LEN || past<MAX_SEG_LEN: past=%08x\n", past);
+		if(past>MAX_SEG_LEN || past<MIN_SEG_LEN){
+			fprintf(stderr,"exiting: past>MAX_SEG_LEN || past<MIN_SEG_LEN: past=%08x\n", past);
 			exit(89);
 		}
 		if(do_crc(0,(unsigned char*)map,len+4)){
@@ -339,16 +347,25 @@ static void spew(char *map, ssize_t mapsize){
 					upperC = addr+len;
 				if(addr<lowerC)
 					lowerC = addr;
-				memcpy(elfdata+4096+64*1024+(addr & SEG_MASK),map,len);
+				memcpy(elfdata+SEG_C_FILE_OFF+(addr & SEG_MASK),map,len);
 			}
 			break;
+		case 0x4000000:
+				{
+					if(addr+len>upper4)
+						upper4 = addr+len;
+					if(addr<lower4)
+						lower4 = addr;
+					memcpy(elfdata+SEG_4_FILE_OFF+(addr & SEG_MASK),map,len); // need to fix dst offset here
+				}
+				break;
 		case 0x00000000:
 			{
 				if(addr+len>upper0)
 					upper0 = addr+len;
 				if(addr<lower0)
 					lower0 = addr;
-				memcpy(elfdata+4096+(addr & SEG_MASK),map,len);
+				memcpy(elfdata+SEG_0_FILE_OFF+(addr & SEG_MASK),map,len);
 			}
 			break;
 		default:
