@@ -27,12 +27,14 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
-#define SEG_MASK 0x0003ffff
-#define MAX_SEG_LEN 0x28000
+#define SHSTRTAB_SZ 0x1000
+
+#define SEG_MASK 0x0007ffff
+#define MAX_SEG_LEN 0x50000
 #define MIN_SEG_LEN 500
-#define SEG_C_FILE_OFF 0x21000
-#define SEG_4_FILE_OFF 0x11000
-#define SEG_0_FILE_OFF 0x01000
+#define SEG_0_FILE_OFF (SHSTRTAB_SZ)
+#define SEG_4_FILE_OFF (SHSTRTAB_SZ+MAX_SEG_LEN)
+#define SEG_C_FILE_OFF (SHSTRTAB_SZ+2*MAX_SEG_LEN)
 
 #if defined(__BIG_ENDIAN__) || defined(_BIG_ENDIAN)
 
@@ -136,9 +138,9 @@ static unsigned do_crc(unsigned remainder, const unsigned char *p, unsigned n){
 
 ////////////////////////////////////
 
-#define SHSTRTAB_SZ 4096
 
-static char elfdata[SHSTRTAB_SZ+(64+64*4)*1024];
+
+static char elfdata[SHSTRTAB_SZ+3*MAX_SEG_LEN];
 
 static unsigned entrypoint;
 
@@ -350,7 +352,7 @@ static void spew(char *map, ssize_t mapsize){
 				memcpy(elfdata+SEG_C_FILE_OFF+(addr & SEG_MASK),map,len);
 			}
 			break;
-		case 0x4000000:
+		case 0x04000000:
 				{
 					if(addr+len>upper4)
 						upper4 = addr+len;
@@ -369,7 +371,7 @@ static void spew(char *map, ssize_t mapsize){
 			}
 			break;
 		default:
-			fprintf(stderr,"exiting: le32_to_cpu(fwheader.baseaddr) is 0x%08x\n",le32_to_cpu(fwheader.baseaddr));
+			fprintf(stderr,"exiting: le32_to_cpu(fwheader.baseaddr) is 0x%08x\nMasked addr is 0x%08x\n",le32_to_cpu(fwheader.baseaddr), addr & ~SEG_MASK);
 			exit(9);
 		}
 //		hexdump("data ",map,le32_to_cpu(fwheader.datalength));
