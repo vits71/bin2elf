@@ -30,7 +30,7 @@ typedef unsigned long long u64;
 #define SHSTRTAB_SZ 0x1000
 
 #define SEG_MASK 0x0007ffff
-#define MAX_SEG_LEN 0x50000
+#define MAX_SEG_LEN 0x60000
 #define MIN_SEG_LEN 500
 #define SEG_0_FILE_OFF (SHSTRTAB_SZ)
 #define SEG_4_FILE_OFF (SHSTRTAB_SZ+MAX_SEG_LEN)
@@ -230,15 +230,16 @@ static void mkelf(void){
 	unsigned x4sz = upper4-lower4;
 	unsigned xcsz = upperC-lowerC;
 	ss("",         0,0,0x00000000,0x00000,0x00000,NULL); // broken GNU crap expects this
-	ss(".000",     0,1,lower0,    MAX_SEG_LEN,SEG_0_FILE_OFF,&x0sz);// 1st chunk of code
-	ss(".040",     1,0,lower4,		0x02000,SEG_4_FILE_OFF,&x4sz); // boot code sets SP to 0x04002000
-	ss(".800",     1,0,0x80000000,0x10000,SEG_4_FILE_OFF,NULL); // IO memory, probably including USB
-	ss(".900",     1,0,0x90000000,0x0c000,SEG_4_FILE_OFF,NULL); // IO memory
+	ss(".firmware",     0,1,lower0,    MAX_SEG_LEN,SEG_0_FILE_OFF,&x0sz);// 1st chunk of code
+	ss(".rom",     0,1,0x3f00000,0x80000,SEG_0_FILE_OFF,NULL);
+	ss(".heap_stack",     1,0,lower4,		0x10000,SEG_4_FILE_OFF,&x4sz); // boot code sets SP to 0x04002000
+	ss(".sdio",     1,0,0x80000000,0x10000,SEG_4_FILE_OFF,NULL); // IO memory, probably including USB
+	ss(".uart",     1,0,0x90000000,0x10000,SEG_4_FILE_OFF,NULL); // IO memory
 	if(lowerC>0xc0000000)
-		ss(".clo",     1,0,0xc0000000,lowerC-0xc0000000,SEG_C_FILE_OFF,NULL);
+		ss(".ram_uninit",     1,0,0xc0000000,lowerC-0xc0000000,SEG_C_FILE_OFF,NULL);
 	unsigned cgap = lowerC - 0xc0000000u;
-	ss(".c00",     1,1,lowerC,    MAX_SEG_LEN-cgap,SEG_C_FILE_OFF+cgap,&xcsz);// 2nd chunk of code, initialized data, uninitialized data, heap
-	ss(".fff",     0,1,0xffff0000,0x0fff0,SEG_C_FILE_OFF+cgap+xcsz,NULL); // there might be a ROM in here somewhere
+	ss(".ram_init",     1,0,lowerC,    MAX_SEG_LEN-cgap,SEG_C_FILE_OFF,&xcsz);// 2nd chunk of code, initialized data, uninitialized data, heap
+	ss(".fff",     0,1,0xffff0000,0x0fff0,SEG_C_FILE_OFF+xcsz,NULL); // there might be a ROM in here somewhere
 	ss(".shstrtab",0,0,0x00000000,0x00000,42, &shsz); // must be last for e_shstrndx patchup below
 
 	memcpy(&e.ehdr,"\177ELF", 4);
