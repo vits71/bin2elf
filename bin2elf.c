@@ -321,8 +321,10 @@ static void spew(char *map, ssize_t mapsize){
 		unsigned len = le32_to_cpu(fwheader.datalength) - 4;
 		unsigned addr = le32_to_cpu(fwheader.baseaddr);
 		unsigned past = (addr & 0x0003ffff) + len;
-		if(past>0x28000 || past<500)
+		if(past>0x28000 || past<500){
+			fprintf(stderr,"exiting: past>0x28000 || past<500\n");
 			exit(89);
+		}
 		if(do_crc(0,(unsigned char*)map,len+4)){
 			fprintf(stderr,"bad body CRC\n");
 			exit(90);
@@ -347,7 +349,7 @@ static void spew(char *map, ssize_t mapsize){
 			}
 			break;
 		default:
-			fprintf(stderr,"le32_to_cpu(fwheader.baseaddr) is 0x%08x\n",le32_to_cpu(fwheader.baseaddr));
+			fprintf(stderr,"exiting: le32_to_cpu(fwheader.baseaddr) is 0x%08x\n",le32_to_cpu(fwheader.baseaddr));
 			exit(9);
 		}
 //		hexdump("data ",map,le32_to_cpu(fwheader.datalength));
@@ -378,7 +380,9 @@ static void mapit(char *name){
   int mapsize = sbuf.st_size;
   fprintf(stderr,"mapped    %6d bytes\n",mapsize);
   spew(map,mapsize);
+	fprintf(stderr,"Making elf\n");
   mkelf();
+	fprintf(stderr,"Writing elf\n");
   fwrite(elfdata,sizeof elfdata,1,stdout);
 }
 
