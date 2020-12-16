@@ -28,6 +28,8 @@ typedef unsigned int u32;
 typedef unsigned long long u64;
 
 #define SEG_MASK 0x0003ffff
+#define MAX_SEG_LEN 0x28000
+#define MIN_SEG_LEN 500
 
 #if defined(__BIG_ENDIAN__) || defined(_BIG_ENDIAN)
 
@@ -225,7 +227,7 @@ static void mkelf(void){
 	if(lowerC>0xc0000000)
 		ss(".clo",     1,0,0xc0000000,lowerC-0xc0000000,0x11000,NULL);
 	unsigned cgap = lowerC - 0xc0000000u;
-	ss(".c00",     1,1,lowerC,    0x28000-cgap,0x11000+cgap,&xcsz);// 2nd chunk of code, initialized data, uninitialized data, heap
+	ss(".c00",     1,1,lowerC,    MAX_SEG_LEN-cgap,0x11000+cgap,&xcsz);// 2nd chunk of code, initialized data, uninitialized data, heap
 	ss(".fff",     0,1,0xffff0000,0x0fff0,0x11000+cgap+xcsz,NULL); // there might be a ROM in here somewhere
 	ss(".shstrtab",0,0,0x00000000,0x00000,42, &shsz); // must be last for e_shstrndx patchup below
 
@@ -322,8 +324,8 @@ static void spew(char *map, ssize_t mapsize){
 		unsigned len = le32_to_cpu(fwheader.datalength) - 4;
 		unsigned addr = le32_to_cpu(fwheader.baseaddr);
 		unsigned past = (addr & SEG_MASK) + len;
-		if(past>0x28000 || past<500){
-			fprintf(stderr,"exiting: past>0x28000 || past<500: past=%08x\n", past);
+		if(past>MAX_SEG_LEN || past<MAX_SEG_LEN){
+			fprintf(stderr,"exiting: past>MAX_SEG_LEN || past<MAX_SEG_LEN: past=%08x\n", past);
 			exit(89);
 		}
 		if(do_crc(0,(unsigned char*)map,len+4)){
