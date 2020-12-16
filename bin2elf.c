@@ -27,6 +27,7 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
+#define SEG_MASK 0x0003ffff
 
 #if defined(__BIG_ENDIAN__) || defined(_BIG_ENDIAN)
 
@@ -320,7 +321,7 @@ static void spew(char *map, ssize_t mapsize){
 		need(le32_to_cpu(fwheader.datalength), "data");
 		unsigned len = le32_to_cpu(fwheader.datalength) - 4;
 		unsigned addr = le32_to_cpu(fwheader.baseaddr);
-		unsigned past = (addr & 0x0003ffff) + len;
+		unsigned past = (addr & SEG_MASK) + len;
 		if(past>0x28000 || past<500){
 			fprintf(stderr,"exiting: past>0x28000 || past<500\n");
 			exit(89);
@@ -329,14 +330,14 @@ static void spew(char *map, ssize_t mapsize){
 			fprintf(stderr,"bad body CRC\n");
 			exit(90);
 		}
-		switch(addr & ~0x0003ffff){
+		switch(addr & ~SEG_MASK){
 		case 0xc0000000:
 			{
 				if(addr+len>upperC)
 					upperC = addr+len;
 				if(addr<lowerC)
 					lowerC = addr;
-				memcpy(elfdata+4096+64*1024+(addr & 0x0003ffff),map,len);
+				memcpy(elfdata+4096+64*1024+(addr & SEG_MASK),map,len);
 			}
 			break;
 		case 0x00000000:
@@ -345,7 +346,7 @@ static void spew(char *map, ssize_t mapsize){
 					upper0 = addr+len;
 				if(addr<lower0)
 					lower0 = addr;
-				memcpy(elfdata+4096+(addr & 0x0003ffff),map,len);
+				memcpy(elfdata+4096+(addr & SEG_MASK),map,len);
 			}
 			break;
 		default:
